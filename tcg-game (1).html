@@ -1,0 +1,1574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rookie League TCG</title>
+<style>
+  :root{
+    --bg-void:#0c0a14;
+    --bg-panel:#171325;
+    --bg-panel-2:#201a35;
+    --line:#332a52;
+    --ink:#f3f0ff;
+    --ink-dim:#a89fc9;
+    --accent:#ff5d8f;
+    --accent-2:#3ee6d0;
+    --gold:#ffc94a;
+    --c-common:#9aa3b2;
+    --c-uncommon:#4ade80;
+    --c-rare:#38bdf8;
+    --c-epic:#b083ff;
+    --c-legendary:#ffb23e;
+    --c-mythic:#ff5d8f;
+    --radius:18px;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    min-height:100vh;
+    background:
+      radial-gradient(circle at 15% 10%, #23163b 0%, transparent 45%),
+      radial-gradient(circle at 85% 85%, #10222f 0%, transparent 50%),
+      var(--bg-void);
+    color:var(--ink);
+    font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    overflow-x:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3{
+    font-weight:800;
+    letter-spacing:-0.01em;
+    margin:0;
+  }
+  button{
+    font-family:inherit;
+    cursor:pointer;
+    border:none;
+    color:inherit;
+  }
+  ::selection{background:var(--accent);color:#fff;}
+
+  /* ---------- background drift ---------- */
+  #driftLayer{
+    position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;
+  }
+  .drift-card{
+    position:absolute;
+    width:46px;height:64px;
+    border-radius:8px;
+    background:linear-gradient(160deg, var(--bg-panel-2), var(--bg-panel));
+    border:1px solid var(--line);
+    opacity:0.35;
+    animation:driftUp linear infinite;
+  }
+  @keyframes driftUp{
+    from{ transform:translateY(110vh) rotate(var(--r0)); }
+    to{ transform:translateY(-20vh) rotate(var(--r1)); }
+  }
+
+  /* ---------- app shell ---------- */
+  #app{
+    position:relative;z-index:1;
+    max-width:920px;
+    margin:0 auto;
+    min-height:100vh;
+    padding:18px 18px 60px;
+    display:flex;
+    flex-direction:column;
+  }
+
+  /* topbar */
+  #topbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    padding:10px 16px;
+    background:rgba(23,19,37,0.75);
+    backdrop-filter:blur(6px);
+    border:1px solid var(--line);
+    border-radius:999px;
+    position:sticky;top:14px;z-index:5;
+  }
+  #brand{
+    display:flex;align-items:center;gap:8px;
+    font-size:15px;font-weight:800;
+    cursor:pointer;
+  }
+  #brand .dot{
+    width:9px;height:9px;border-radius:50%;
+    background:var(--accent-2);
+    box-shadow:0 0 10px var(--accent-2);
+  }
+  #wallet{
+    display:flex;align-items:center;gap:8px;
+    background:var(--bg-panel);
+    border:1px solid var(--line);
+    padding:7px 14px 7px 8px;
+    border-radius:999px;
+    font-weight:700;
+    font-size:14px;
+  }
+  #coinIcon{
+    width:22px;height:22px;border-radius:50%;
+    background:radial-gradient(circle at 32% 30%, #fff6d6, var(--gold) 55%, #b9791a 100%);
+    box-shadow:0 0 8px rgba(255,201,74,0.6);
+    display:inline-block;
+    flex-shrink:0;
+  }
+  #coinIcon.bump{ animation:coinBump 0.4s ease; }
+  @keyframes coinBump{ 0%{transform:scale(1)} 40%{transform:scale(1.35) rotate(15deg)} 100%{transform:scale(1)} }
+  #coinCount{ font-variant-numeric:tabular-nums; }
+
+  /* screens */
+  .screen{ display:none; flex:1; padding-top:26px; animation:fadeIn 0.35s ease; }
+  .screen.active{ display:flex; flex-direction:column; }
+  @keyframes fadeIn{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+
+  /* ---------- menu ---------- */
+  #screen-menu{ align-items:center; text-align:center; justify-content:center; gap:10px; }
+  #menuTitleWrap{ margin-bottom:6px; }
+  #menuKicker{
+    color:var(--accent-2); font-weight:700; font-size:13px;
+    letter-spacing:0.02em;
+  }
+  #menuTitle{
+    font-size:56px; line-height:0.95;
+    background:linear-gradient(120deg, #fff 10%, var(--accent-2) 45%, var(--accent) 90%);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    filter:drop-shadow(0 0 26px rgba(62,230,208,0.25));
+    margin:6px 0 4px;
+  }
+  #menuSub{ color:var(--ink-dim); font-size:15px; max-width:420px; margin:0 auto 26px; }
+
+  #menuGrid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px;
+    width:100%;
+    max-width:520px;
+  }
+  .menu-btn{
+    position:relative;
+    background:linear-gradient(160deg, var(--bg-panel-2), var(--bg-panel));
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:22px 16px;
+    text-align:left;
+    display:flex; flex-direction:column; gap:8px;
+    transition:transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+    overflow:hidden;
+  }
+  .menu-btn::after{
+    content:"";
+    position:absolute; inset:0;
+    background:radial-gradient(circle at 85% 0%, var(--glow, transparent), transparent 60%);
+    opacity:0.5;
+    pointer-events:none;
+  }
+  .menu-btn:hover{ transform:translateY(-4px); border-color:var(--edge,var(--accent-2)); box-shadow:0 10px 28px -12px var(--edge,var(--accent-2)); }
+  .menu-btn .icon{ font-size:26px; }
+  .menu-btn .label{ font-size:16px; font-weight:800; }
+  .menu-btn .sub{ font-size:12.5px; color:var(--ink-dim); font-weight:500; }
+  .menu-btn.wide{ grid-column:1 / -1; }
+
+  /* ---------- generic screen header ---------- */
+  .screen-head{
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:18px; gap:10px; flex-wrap:wrap;
+  }
+  .back-btn{
+    background:var(--bg-panel); border:1px solid var(--line);
+    padding:9px 14px; border-radius:999px; font-weight:700; font-size:13px;
+    color:var(--ink-dim);
+    transition:color 0.15s, border-color 0.15s;
+  }
+  .back-btn:hover{ color:var(--ink); border-color:var(--accent-2); }
+  .screen-title{ font-size:24px; }
+  .screen-desc{ color:var(--ink-dim); font-size:13.5px; margin-top:4px; }
+
+  /* ---------- book ---------- */
+  #bookStats{
+    display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap;
+  }
+  .stat-pill{
+    background:var(--bg-panel); border:1px solid var(--line);
+    border-radius:12px; padding:10px 14px; font-size:12.5px; color:var(--ink-dim);
+    flex:1; min-width:110px;
+  }
+  .stat-pill b{ display:block; font-size:19px; color:var(--ink); font-weight:800; }
+  /* ---------- book ---------- */
+  #bookOuter{
+    display:flex; align-items:center; gap:8px;
+  }
+  .page-arrow{
+    flex-shrink:0;
+    width:40px; height:40px; border-radius:50%;
+    background:var(--bg-panel); border:1px solid var(--line);
+    font-size:18px; font-weight:800; color:var(--ink);
+    display:flex; align-items:center; justify-content:center;
+    transition:border-color 0.15s, transform 0.15s;
+  }
+  .page-arrow:hover:not(:disabled){ border-color:var(--accent-2); transform:scale(1.06); }
+  .page-arrow:disabled{ opacity:0.25; cursor:default; }
+  #bookContainer{
+    flex:1;
+    display:flex;
+    background:linear-gradient(160deg,#241a12,#171018);
+    border:1px solid #3a2a1e;
+    border-radius:14px;
+    padding:14px;
+    box-shadow:0 18px 40px -20px rgba(0,0,0,0.7), inset 0 0 30px rgba(0,0,0,0.35);
+    min-height:420px;
+    position:relative;
+  }
+  .book-page{
+    flex:1;
+    background:var(--bg-panel);
+    border-radius:8px;
+    padding:14px 12px;
+    min-width:0;
+    display:flex;
+    flex-direction:column;
+    animation:pageIn 0.3s ease;
+  }
+  @keyframes pageIn{ from{ opacity:0; transform:scale(0.98); } to{ opacity:1; transform:scale(1); } }
+  .book-page.left{ border-top-right-radius:2px; border-bottom-right-radius:2px; }
+  .book-page.right{ border-top-left-radius:2px; border-bottom-left-radius:2px; }
+  .book-spine{
+    width:14px; flex-shrink:0;
+    background:linear-gradient(90deg, rgba(0,0,0,0.45), rgba(0,0,0,0.1) 30%, rgba(0,0,0,0.1) 70%, rgba(0,0,0,0.45));
+  }
+  .page-title{ font-size:13px; font-weight:800; margin-bottom:2px; }
+  .page-sub{ font-size:10.5px; color:var(--ink-dim); margin-bottom:10px; }
+  .page-slots{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(64px,1fr));
+    gap:6px;
+    overflow-y:auto;
+    flex:1;
+    padding-right:2px;
+  }
+  #pageDots{ display:flex; justify-content:center; gap:6px; margin-top:10px; }
+  .page-dot{
+    width:7px; height:7px; border-radius:50%; background:var(--line); border:none; padding:0;
+  }
+  .page-dot.active{ background:var(--accent-2); width:18px; border-radius:4px; }
+
+  .card-tile{
+    aspect-ratio:3/4.2;
+    border-radius:9px;
+    border:1.5px solid var(--line);
+    background:var(--bg-panel-2);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:5px 4px;
+    text-align:center;
+    position:relative;
+    transition:transform 0.15s ease;
+  }
+  .card-tile:hover{ transform:translateY(-3px); }
+  .card-tile .rname{ font-size:9px; font-weight:700; line-height:1.15; }
+  .card-tile .rtag{ font-size:7.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; margin-top:3px; opacity:0.8; }
+  .card-tile .count-badge{
+    position:absolute; top:3px; right:3px;
+    background:rgba(0,0,0,0.55); border-radius:999px;
+    font-size:8px; font-weight:800; padding:1px 5px;
+  }
+  .card-tile.locked{ opacity:0.4; filter:grayscale(1); }
+  .card-tile.locked .rname{ visibility:hidden; }
+  .card-tile.locked::before{ content:"?"; font-size:16px; font-weight:800; color:var(--ink-dim); }
+  @media (max-width:520px){
+    #bookContainer{ padding:8px; }
+    .book-spine{ width:8px; }
+    .page-slots{ grid-template-columns:repeat(auto-fill, minmax(52px,1fr)); }
+  }
+  .rar-common{ box-shadow:inset 0 0 0 1.5px var(--c-common); }
+  .rar-uncommon{ box-shadow:inset 0 0 0 1.5px var(--c-uncommon); }
+  .rar-rare{ box-shadow:inset 0 0 0 1.5px var(--c-rare); }
+  .rar-epic{ box-shadow:inset 0 0 0 1.5px var(--c-epic); }
+  .rar-legendary{ box-shadow:inset 0 0 12px -2px var(--c-legendary), inset 0 0 0 1.5px var(--c-legendary); }
+  .rar-mythic{ box-shadow:inset 0 0 16px -1px var(--c-mythic), inset 0 0 0 1.5px var(--c-mythic); animation:mythicPulse 2.2s ease-in-out infinite; }
+  @keyframes mythicPulse{
+    0%,100%{ box-shadow:inset 0 0 16px -1px #ff5d8f, inset 0 0 0 1.5px #ff5d8f; }
+    50%{ box-shadow:inset 0 0 22px 2px #ffc94a, inset 0 0 0 1.5px #ffc94a; }
+  }
+
+  /* ---------- modal ---------- */
+  #modalBack{
+    position:fixed; inset:0; background:rgba(6,5,12,0.72); backdrop-filter:blur(3px);
+    display:none; align-items:center; justify-content:center; z-index:50; padding:20px;
+  }
+  #modalBack.active{ display:flex; }
+  #modalCard{
+    background:var(--bg-panel); border:1px solid var(--line); border-radius:20px;
+    padding:24px; width:100%; max-width:340px; text-align:center;
+    animation:popIn 0.22s ease;
+  }
+  @keyframes popIn{ from{ transform:scale(0.9); opacity:0; } to{ transform:scale(1); opacity:1; } }
+  #modalName{ font-size:20px; margin-bottom:4px; }
+  #modalRarity{ font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:16px; }
+  #modalCount{ color:var(--ink-dim); font-size:13px; margin-bottom:18px; }
+  #modalActions{ display:flex; gap:8px; }
+  .btn{
+    flex:1; padding:11px; border-radius:12px; font-weight:800; font-size:13.5px;
+    background:var(--bg-panel-2); border:1px solid var(--line); color:var(--ink);
+  }
+  .btn:hover{ border-color:var(--accent-2); }
+  .btn.primary{ background:var(--accent-2); color:#0c0a14; border-color:var(--accent-2); }
+  .btn.danger{ background:transparent; border-color:var(--accent); color:var(--accent); }
+  .btn:disabled{ opacity:0.35; cursor:not-allowed; }
+
+  /* ---------- shop ---------- */
+  #packGrid{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .pack-card{
+    background:linear-gradient(160deg, var(--bg-panel-2), var(--bg-panel));
+    border:1px solid var(--line); border-radius:16px; padding:18px;
+    display:flex; flex-direction:column; gap:8px;
+  }
+  .pack-card .pname{ font-size:16px; font-weight:800; }
+  .pack-card .pdesc{ font-size:12px; color:var(--ink-dim); flex:1; }
+  .pack-card .podds{ font-size:10.5px; color:var(--ink-dim); line-height:1.6; }
+  .pack-card .pbuy{
+    margin-top:8px; padding:10px; border-radius:10px; font-weight:800; font-size:13px;
+    background:var(--gold); color:#241703; display:flex; align-items:center; justify-content:center; gap:6px;
+  }
+  .pack-card .pbuy:disabled{ background:var(--bg-panel-2); color:var(--ink-dim); }
+
+  /* ---------- pack opening ---------- */
+  #openStage{
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; flex:1;
+    padding:10px 0 30px;
+  }
+  #openCounter{ font-size:12.5px; font-weight:800; color:var(--ink-dim); letter-spacing:0.04em; }
+  #openHint{ font-size:12.5px; color:var(--ink-dim); min-height:16px; }
+  #openStack{
+    position:relative;
+    width:200px; height:280px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .reveal-card{
+    position:absolute;
+    top:0; left:0;
+    width:200px; height:280px; border-radius:16px;
+    transform-style:preserve-3d;
+    transition:transform 0.45s cubic-bezier(.2,.8,.2,1), opacity 0.3s ease;
+    cursor:grab;
+    touch-action:none;
+  }
+  .reveal-card:active{ cursor:grabbing; }
+  .reveal-card .face{
+    position:absolute; inset:0; border-radius:16px; backface-visibility:hidden;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; padding:14px; border:1.5px solid var(--line);
+  }
+  .reveal-card .back{
+    background:
+      repeating-linear-gradient(135deg, rgba(255,255,255,0.03) 0 10px, transparent 10px 20px),
+      linear-gradient(150deg,#2a2148,#171325);
+    font-size:40px;
+  }
+  .reveal-card .back .backLabel{ font-size:11px; font-weight:800; color:var(--ink-dim); margin-top:10px; letter-spacing:0.04em; }
+  .reveal-card .front{ background:var(--bg-panel); transform:rotateY(180deg); }
+  .reveal-card .front .rname{ font-size:16px; font-weight:800; }
+  .reveal-card .front .rtag{ font-size:11px; font-weight:800; text-transform:uppercase; margin-top:8px; letter-spacing:0.04em; }
+  .reveal-card .front .rglyph{ font-size:34px; margin-bottom:10px; }
+
+  /* ---------- games hub ---------- */
+  #gameGrid{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .game-card{
+    background:linear-gradient(160deg, var(--bg-panel-2), var(--bg-panel));
+    border:1px solid var(--line); border-radius:16px; padding:18px;
+    text-align:left; display:flex; flex-direction:column; gap:6px; min-height:130px;
+    transition:transform 0.15s ease, border-color 0.15s;
+  }
+  .game-card:hover{ transform:translateY(-3px); border-color:var(--accent); }
+  .game-card .gicon{ font-size:24px; }
+  .game-card .gname{ font-weight:800; font-size:15px; }
+  .game-card .gdesc{ font-size:12px; color:var(--ink-dim); }
+  .game-card .greward{ margin-top:auto; font-size:11px; font-weight:800; color:var(--gold); }
+
+  /* ---------- active game shell ---------- */
+  #gameStageWrap{ display:flex; flex-direction:column; align-items:center; gap:12px; }
+  #gameHud{
+    display:flex; gap:10px; justify-content:center; flex-wrap:wrap; font-size:13px; font-weight:700;
+  }
+  #gameHud span{ background:var(--bg-panel); border:1px solid var(--line); padding:6px 12px; border-radius:999px; }
+  #gameCanvasBox{
+    background:#0a0814; border:1px solid var(--line); border-radius:16px;
+    padding:10px; touch-action:none;
+  }
+  #gameControls{ display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
+  #gameControls button{
+    background:var(--bg-panel); border:1px solid var(--line); border-radius:10px;
+    padding:10px 16px; font-weight:800; font-size:13px;
+  }
+  #gameMsg{ text-align:center; font-size:13px; color:var(--ink-dim); min-height:18px; }
+
+  /* memory grid */
+  #memGrid{ display:grid; grid-template-columns:repeat(4, 62px); gap:8px; }
+  .mem-cell{
+    width:62px; height:62px; border-radius:10px; background:var(--bg-panel-2);
+    border:1.5px solid var(--line); display:flex; align-items:center; justify-content:center;
+    font-size:22px; cursor:pointer; user-select:none;
+  }
+  .mem-cell.up{ background:var(--bg-panel); }
+  .mem-cell.matched{ opacity:0.35; }
+
+  /* whack grid */
+  #whackGrid{ display:grid; grid-template-columns:repeat(3, 78px); gap:10px; }
+  .whack-hole{
+    width:78px; height:78px; border-radius:50%; background:#0a0814;
+    border:2px solid var(--line); display:flex; align-items:center; justify-content:center;
+    font-size:30px; cursor:pointer; overflow:hidden;
+  }
+  .whack-hole.active{ border-color:var(--gold); }
+
+  /* toast */
+  #toast{
+    position:fixed; bottom:22px; left:50%; transform:translateX(-50%) translateY(20px);
+    background:var(--bg-panel-2); border:1px solid var(--line); padding:11px 20px;
+    border-radius:999px; font-size:13px; font-weight:700; z-index:60;
+    opacity:0; pointer-events:none; transition:all 0.25s ease;
+  }
+  #toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  @media (max-width:520px){
+    #menuTitle{ font-size:42px; }
+    #packGrid, #gameGrid{ grid-template-columns:1fr; }
+    #menuGrid{ grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div id="driftLayer"></div>
+
+<div id="app">
+  <div id="topbar">
+    <div id="brand" onclick="goTo('menu')"><span class="dot"></span>ROOKIE LEAGUE</div>
+    <div id="wallet"><span id="coinIcon"></span><span id="coinCount">0</span></div>
+  </div>
+
+  <!-- MENU -->
+  <div class="screen active" id="screen-menu">
+    <div id="menuTitleWrap">
+      <div id="menuKicker">A TRADING CARD COLLECTION GAME</div>
+      <h1 id="menuTitle">Rookie<br>League</h1>
+      <p id="menuSub">Play quick games to earn coins, crack packs, and fill every page of your book. 115 rookies out there — one of them is nearly impossible to find.</p>
+    </div>
+    <div id="menuGrid">
+      <button class="menu-btn wide" style="--glow:rgba(255,93,143,0.35); --edge:var(--accent);" onclick="goTo('games')">
+        <div class="icon">🕹️</div>
+        <div class="label">Play &amp; Earn</div>
+        <div class="sub">5 mini-games — win coins to spend in the shop</div>
+      </button>
+      <button class="menu-btn" style="--glow:rgba(62,230,208,0.35); --edge:var(--accent-2);" onclick="goTo('book')">
+        <div class="icon">📖</div>
+        <div class="label">Card Book</div>
+        <div class="sub" id="menuBookProgress">0 / 115 collected</div>
+      </button>
+      <button class="menu-btn" style="--glow:rgba(255,201,74,0.35); --edge:var(--gold);" onclick="goTo('shop')">
+        <div class="icon">🎁</div>
+        <div class="label">Pack Shop</div>
+        <div class="sub">5 pack tiers, better odds up top</div>
+      </button>
+      <button class="menu-btn wide" style="--glow:rgba(176,131,255,0.3); --edge:var(--c-epic);" onclick="goTo('sell')">
+        <div class="icon">💰</div>
+        <div class="label">Sell Duplicates</div>
+        <div class="sub">Turn spare cards into coins — keeps your first copy safe</div>
+      </button>
+    </div>
+  </div>
+
+  <!-- GAMES HUB -->
+  <div class="screen" id="screen-games">
+    <div class="screen-head">
+      <div><div class="screen-title">Play &amp; Earn</div><div class="screen-desc">Pick a game. Every round pays out coins.</div></div>
+      <button class="back-btn" onclick="goTo('menu')">← Menu</button>
+    </div>
+    <div id="gameGrid"></div>
+  </div>
+
+  <!-- ACTIVE GAME -->
+  <div class="screen" id="screen-play">
+    <div class="screen-head">
+      <div><div class="screen-title" id="playTitle">Game</div><div class="screen-desc" id="playDesc"></div></div>
+      <button class="back-btn" onclick="stopActiveGame(); goTo('games')">← Games</button>
+    </div>
+    <div id="gameStageWrap">
+      <div id="gameHud"></div>
+      <div id="gameCanvasBox"></div>
+      <div id="gameControls"></div>
+      <div id="gameMsg"></div>
+    </div>
+  </div>
+
+  <!-- BOOK -->
+  <div class="screen" id="screen-book">
+    <div class="screen-head">
+      <div><div class="screen-title">Card Book</div><div class="screen-desc">Tap any card for details.</div></div>
+      <button class="back-btn" onclick="goTo('menu')">← Menu</button>
+    </div>
+    <div id="bookStats"></div>
+    <div id="bookOuter">
+      <button class="page-arrow" id="pagePrev" aria-label="Previous page">‹</button>
+      <div id="bookContainer">
+        <div class="book-page left" id="pageLeft"></div>
+        <div class="book-spine"></div>
+        <div class="book-page right" id="pageRight"></div>
+      </div>
+      <button class="page-arrow" id="pageNext" aria-label="Next page">›</button>
+    </div>
+    <div id="pageDots"></div>
+  </div>
+
+  <!-- SHOP -->
+  <div class="screen" id="screen-shop">
+    <div class="screen-head">
+      <div><div class="screen-title">Pack Shop</div><div class="screen-desc">Higher tiers cost more but drop better rarities.</div></div>
+      <button class="back-btn" onclick="goTo('menu')">← Menu</button>
+    </div>
+    <div id="packGrid"></div>
+  </div>
+
+  <!-- OPEN PACK -->
+  <div class="screen" id="screen-open">
+    <div class="screen-head">
+      <div><div class="screen-title">Opening Pack…</div><div class="screen-desc" id="openDesc">Tap the card to flip it, then swipe it away.</div></div>
+      <button class="back-btn" onclick="goTo('shop')">← Shop</button>
+    </div>
+    <div id="openStage">
+      <div id="openCounter"></div>
+      <div id="openStack"></div>
+      <div id="openHint">Tap card to reveal</div>
+      <button class="btn primary" style="max-width:220px; visibility:hidden;" id="openDoneBtn" onclick="goTo('shop')">Done</button>
+    </div>
+  </div>
+
+  <!-- SELL -->
+  <div class="screen" id="screen-sell">
+    <div class="screen-head">
+      <div><div class="screen-title">Sell Duplicates</div><div class="screen-desc">Only spare copies are sellable — your first of each card is always kept.</div></div>
+      <button class="back-btn" onclick="goTo('menu')">← Menu</button>
+    </div>
+    <div id="bookStats2" class="stat-pill" style="margin-bottom:14px;"></div>
+    <div id="sellGrid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(150px,1fr)); gap:10px;"></div>
+  </div>
+
+</div>
+
+<div id="modalBack">
+  <div id="modalCard">
+    <h3 id="modalName">—</h3>
+    <div id="modalRarity">—</div>
+    <div id="modalCount">—</div>
+    <div id="modalActions">
+      <button class="btn danger" id="modalSellBtn">Sell 1</button>
+      <button class="btn primary" id="modalCloseBtn">Close</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* =========================================================
+   DATA
+   ========================================================= */
+const RARITY = {
+  mythic:    {label:"Mythic",    color:"var(--c-mythic)",    value:4000},
+  legendary: {label:"Legendary", color:"var(--c-legendary)", value:400},
+  epic:      {label:"Epic",      color:"var(--c-epic)",      value:90},
+  rare:      {label:"Rare",      color:"var(--c-rare)",      value:30},
+  uncommon:  {label:"Uncommon",  color:"var(--c-uncommon)",  value:12},
+  common:    {label:"Common",    color:"var(--c-common)",    value:5},
+};
+const RARITY_ORDER = ["mythic","legendary","epic","rare","uncommon","common"];
+
+const CARD_DB = [
+  ["Sebastian Hili","mythic"],
+  ["Finn Cronin","legendary"],["Ethan Flower","legendary"],["Joshua Carpenter","legendary"],
+  ["Harrison Kluit","legendary"],["Jesse Lloyd","legendary"],["Ella Nash","legendary"],
+  ["Annalise Manning","epic"],["Asees Kaur","epic"],["Ashton Karaiste","epic"],["Chiara Vece","epic"],
+  ["Connor Nielsen","epic"],["Ella MacDermott","epic"],["Ella McTaggart","epic"],["Evie French","epic"],
+  ["Ivy Bradshaw","epic"],["Jacob Morgan","epic"],["Kaitlyn Dudley","epic"],["Kiah Evans","epic"],
+  ["Olivia Turner","epic"],["Ruby McKay","epic"],["William McPherson","epic"],
+  ["Abbey Romeo","rare"],["Abigail Mackrill","rare"],["Amarli-Paige Hill","rare"],["Annabel Williams","rare"],
+  ["Beau Aylett","rare"],["Byron Strong","rare"],["Charlie Waller","rare"],["Claire Hughes","rare"],
+  ["Cooper Ison","rare"],["Craig Tyler","rare"],["Damon Foley","rare"],["Emily Benad","rare"],
+  ["Ethan Boardman","rare"],["Gemma Read","rare"],["Harper Larnach","rare"],["Jai Ross","rare"],
+  ["James Martin","rare"],["Kayathri Baranowski","rare"],["Lachlan Malcolm","rare"],["Liam Gospel","rare"],
+  ["Marcus Batshon","rare"],["Myka Lampard","rare"],["Nicholas Garner-Haddad","rare"],["Nikolas Orr","rare"],
+  ["Scarlett Romeijn","rare"],
+  ["Ashley Baker","uncommon"],["Brayden Garner-Haddad","uncommon"],["Charlotte Bissett","uncommon"],
+  ["Cooper Watkiss","uncommon"],["Darcy Parry","uncommon"],["Eli Norman","uncommon"],["Erin Brown","uncommon"],
+  ["Erin Wright","uncommon"],["Finn Coskerie","uncommon"],["Hannah Godkin","uncommon"],["Hayley Waites","uncommon"],
+  ["Jack Belanszky","uncommon"],["Jacob Smith","uncommon"],["Jakeb D'Arcangelo","uncommon"],
+  ["James Kirschner","uncommon"],["Jasmine Higham","uncommon"],["Jonah Law","uncommon"],["Jordyn Mackay","uncommon"],
+  ["Lachlan Pritchett","uncommon"],["Lara Lewis","uncommon"],["Leo Micari","uncommon"],["Liam Moroz","uncommon"],
+  ["Madeline Sammut","uncommon"],["Malachi Harper","uncommon"],["Mariah Jacobs","uncommon"],["Max Addison","uncommon"],
+  ["Max Farrell","uncommon"],["Minka Van Son","uncommon"],["Motunrayo Akinba","uncommon"],["Noah Scholz","uncommon"],
+  ["Peyton Langford","uncommon"],["Rebecca McIntosh","uncommon"],["Tyson Smith","uncommon"],["Vivian Hearne","uncommon"],
+  ["Zoe Dippenaar","uncommon"],
+  ["Alistair Novak","common"],["Amber Rodriguez","common"],["Angelina Kumar","common"],["Ava Jowsey","common"],
+  ["Ayden Tipler","common"],["Caylen Goldsbrough","common"],["Clancy Maitz","common"],["Daisy White","common"],
+  ["Dillan Johnston","common"],["Hannah Elton","common"],["Hannah Jung","common"],["Harrison Turnock","common"],
+  ["Harry Ostridge","common"],["Jai Smith","common"],["Jayden Robertson","common"],["Kale Hoffman","common"],
+  ["Kyan Potter","common"],["Laura Madgwick","common"],["Leah Dalrymple","common"],["Lucienne Walker","common"],
+  ["Matilda Laverty","common"],["Nate Pietraszkiewicz","common"],["Noah Jacobs","common"],["Riley Richter","common"],
+  ["Roman Boyd","common"],["Samuel Cashmere","common"],["Sienna Atkins","common"],["Teila Jeremiejczyk","common"],
+  ["Tiffany Hott","common"],["Tilly-Rose Vermaak","common"],["William Waugh","common"],["Xavier Hurst","common"],
+  ["Ziva Dobbinson","common"],
+].map(([name,rarity])=>({name,rarity}));
+
+const PACKS = [
+  { id:"bronze", name:"Bronze Pack", cost:60, draws:3,
+    desc:"Cheap and cheerful. Mostly common & uncommon rookies.",
+    odds:{common:60, uncommon:30, rare:8, epic:1.8, legendary:0.2, mythic:0} },
+  { id:"silver", name:"Silver Pack", cost:150, draws:3,
+    desc:"A real shot at rares, occasional epics.",
+    odds:{common:40, uncommon:35, rare:18, epic:6, legendary:0.9, mythic:0.1} },
+  { id:"gold", name:"Gold Pack", cost:350, draws:3,
+    desc:"Loaded odds for epics, real legendary chance.",
+    odds:{common:20, uncommon:30, rare:30, epic:15, legendary:4.5, mythic:0.5} },
+  { id:"diamond", name:"Diamond Pack", cost:700, draws:3,
+    desc:"No commons at all. Built for rare-and-up hunters.",
+    odds:{common:0, uncommon:20, rare:40, epic:28, legendary:10, mythic:2} },
+  { id:"mythicpack", name:"Hall of Fame Pack", cost:1800, draws:3,
+    desc:"Every card is epic or better. Best mythic odds in the game.",
+    odds:{common:0, uncommon:0, rare:10, epic:40, legendary:40, mythic:10} },
+];
+
+/* =========================================================
+   STATE
+   ========================================================= */
+const state = {
+  coins: 120,
+  collection: {}, // name -> count
+};
+CARD_DB.forEach(c=>{ state.collection[c.name]=0; });
+// starter cards so the book / sell screens aren't empty
+["Alistair Novak","Ashley Baker","Jai Ross"].forEach(n=>state.collection[n]=1);
+
+function cardByName(name){ return CARD_DB.find(c=>c.name===name); }
+function ownedCount(){ return Object.values(state.collection).filter(v=>v>0).length; }
+function totalCopies(){ return Object.values(state.collection).reduce((a,b)=>a+b,0); }
+
+function addCoins(n){
+  state.coins += n;
+  renderWallet(true);
+}
+function spendCoins(n){
+  if(state.coins < n) return false;
+  state.coins -= n;
+  renderWallet(true);
+  return true;
+}
+function giveCard(name){
+  state.collection[name] = (state.collection[name]||0) + 1;
+  return state.collection[name];
+}
+
+function renderWallet(bump){
+  document.getElementById('coinCount').textContent = Math.floor(state.coins).toLocaleString();
+  document.getElementById('menuBookProgress').textContent = `${ownedCount()} / ${CARD_DB.length} collected`;
+  if(bump){
+    const icon = document.getElementById('coinIcon');
+    icon.classList.remove('bump'); void icon.offsetWidth; icon.classList.add('bump');
+  }
+}
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(()=>t.classList.remove('show'), 1800);
+}
+
+/* =========================================================
+   NAV
+   ========================================================= */
+function goTo(name){
+  stopActiveGame();
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+name).classList.add('active');
+  if(name==='book') renderBook();
+  if(name==='shop') renderShop();
+  if(name==='games') renderGamesHub();
+  if(name==='sell') renderSell();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+/* =========================================================
+   BACKGROUND DRIFT CARDS
+   ========================================================= */
+(function initDrift(){
+  const layer = document.getElementById('driftLayer');
+  const n = 14;
+  for(let i=0;i<n;i++){
+    const d = document.createElement('div');
+    d.className = 'drift-card';
+    const left = Math.random()*100;
+    const dur = 16 + Math.random()*18;
+    const delay = -Math.random()*30;
+    const r0 = (Math.random()*30-15)+'deg';
+    const r1 = (Math.random()*30-15)+'deg';
+    d.style.left = left+'%';
+    d.style.animationDuration = dur+'s';
+    d.style.animationDelay = delay+'s';
+    d.style.setProperty('--r0', r0);
+    d.style.setProperty('--r1', r1);
+    layer.appendChild(d);
+  }
+})();
+
+/* =========================================================
+   BOOK
+   ========================================================= */
+const BOOK_SPREADS = [
+  ["mythic","legendary"],
+  ["epic","rare"],
+  ["uncommon","common"],
+];
+let currentSpread = 0;
+
+function renderBook(){
+  const stats = document.getElementById('bookStats');
+  stats.innerHTML = `
+    <div class="stat-pill"><b>${ownedCount()}/${CARD_DB.length}</b>Unique cards</div>
+    <div class="stat-pill"><b>${totalCopies()}</b>Total copies</div>
+    <div class="stat-pill"><b>${state.collection['Sebastian Hili']>0 ? 'YES' : 'NO'}</b>Mythic found</div>
+  `;
+  renderSpread();
+}
+
+function fillPage(el, rarity){
+  const cards = CARD_DB.filter(c=>c.rarity===rarity);
+  const owned = cards.filter(c=>state.collection[c.name]>0).length;
+  el.innerHTML = `
+    <div class="page-title" style="color:${RARITY[rarity].color}">${RARITY[rarity].label}</div>
+    <div class="page-sub">${owned} / ${cards.length} collected</div>
+    <div class="page-slots"></div>
+  `;
+  const slots = el.querySelector('.page-slots');
+  cards.forEach(c=>{
+    const isOwned = state.collection[c.name] > 0;
+    const tile = document.createElement('div');
+    tile.className = `card-tile rar-${c.rarity}` + (isOwned ? '' : ' locked');
+    tile.innerHTML = isOwned ? `
+      <div class="rname">${c.name}</div>
+      <div class="rtag" style="color:${RARITY[c.rarity].color}">${RARITY[c.rarity].label}</div>
+      ${state.collection[c.name] > 1 ? `<div class="count-badge">x${state.collection[c.name]}</div>` : ''}
+    ` : '';
+    tile.onclick = ()=> openCardModal(c.name);
+    slots.appendChild(tile);
+  });
+}
+
+function renderSpread(){
+  const [leftRarity, rightRarity] = BOOK_SPREADS[currentSpread];
+  const pageLeft = document.getElementById('pageLeft');
+  const pageRight = document.getElementById('pageRight');
+  pageLeft.classList.remove('pageIn'); void pageLeft.offsetWidth;
+  pageRight.classList.remove('pageIn'); void pageRight.offsetWidth;
+  fillPage(pageLeft, leftRarity);
+  fillPage(pageRight, rightRarity);
+
+  document.getElementById('pagePrev').disabled = currentSpread===0;
+  document.getElementById('pageNext').disabled = currentSpread===BOOK_SPREADS.length-1;
+
+  const dots = document.getElementById('pageDots');
+  dots.innerHTML = "";
+  BOOK_SPREADS.forEach((_,i)=>{
+    const d = document.createElement('button');
+    d.className = 'page-dot' + (i===currentSpread ? ' active':'');
+    d.onclick = ()=>{ currentSpread=i; renderSpread(); };
+    dots.appendChild(d);
+  });
+}
+
+document.getElementById('pagePrev').addEventListener('click', ()=>{
+  if(currentSpread>0){ currentSpread--; renderSpread(); }
+});
+document.getElementById('pageNext').addEventListener('click', ()=>{
+  if(currentSpread<BOOK_SPREADS.length-1){ currentSpread++; renderSpread(); }
+});
+
+function openCardModal(name){
+  const c = cardByName(name);
+  const owned = state.collection[name] || 0;
+  document.getElementById('modalName').textContent = owned>0 ? name : '???';
+  const rTag = document.getElementById('modalRarity');
+  rTag.textContent = owned>0 ? RARITY[c.rarity].label : 'Not yet collected';
+  rTag.style.color = owned>0 ? RARITY[c.rarity].color : 'var(--ink-dim)';
+  document.getElementById('modalCount').textContent = owned>0
+    ? `You own ${owned} cop${owned===1?'y':'ies'}${owned>1 ? ` — worth ${RARITY[c.rarity].value} coins each to sell` : ' (find a duplicate to sell)'}`
+    : 'Pull it from a pack to reveal this card.';
+  const sellBtn = document.getElementById('modalSellBtn');
+  sellBtn.disabled = owned <= 1;
+  sellBtn.textContent = `Sell 1 (+${owned>0?RARITY[c.rarity].value:0})`;
+  sellBtn.onclick = ()=>{
+    if(state.collection[name] > 1){
+      state.collection[name]--;
+      addCoins(RARITY[c.rarity].value);
+      toast(`Sold ${name} for ${RARITY[c.rarity].value} coins`);
+      openCardModal(name);
+      renderBook();
+    }
+  };
+  document.getElementById('modalCloseBtn').onclick = closeModal;
+  document.getElementById('modalBack').classList.add('active');
+}
+function closeModal(){ document.getElementById('modalBack').classList.remove('active'); }
+document.getElementById('modalBack').addEventListener('click', e=>{
+  if(e.target.id==='modalBack') closeModal();
+});
+
+/* =========================================================
+   SELL SCREEN
+   ========================================================= */
+function renderSell(){
+  const dupes = CARD_DB.filter(c => state.collection[c.name] > 1);
+  document.getElementById('bookStats2').innerHTML =
+    `<b>${dupes.reduce((a,c)=>a+(state.collection[c.name]-1),0)}</b>Sellable duplicate cards`;
+  const grid = document.getElementById('sellGrid');
+  grid.innerHTML = "";
+  if(dupes.length===0){
+    grid.innerHTML = `<div style="grid-column:1/-1; color:var(--ink-dim); font-size:13px; padding:20px 0;">No duplicates yet — open packs and come back once you've got spares.</div>`;
+    return;
+  }
+  dupes.sort((a,b)=> RARITY_ORDER.indexOf(a.rarity)-RARITY_ORDER.indexOf(b.rarity));
+  dupes.forEach(c=>{
+    const spare = state.collection[c.name]-1;
+    const row = document.createElement('div');
+    row.className = `card-tile rar-${c.rarity}`;
+    row.style.cursor = 'default';
+    row.innerHTML = `
+      <div class="rname">${c.name}</div>
+      <div class="rtag" style="color:${RARITY[c.rarity].color}">${RARITY[c.rarity].label}</div>
+      <div class="count-badge">${spare} spare</div>
+      <button class="btn danger" style="margin-top:8px; padding:6px; font-size:11px;">Sell 1 (+${RARITY[c.rarity].value})</button>
+    `;
+    row.querySelector('button').onclick = ()=>{
+      state.collection[c.name]--;
+      addCoins(RARITY[c.rarity].value);
+      toast(`Sold ${c.name} for ${RARITY[c.rarity].value} coins`);
+      renderSell();
+    };
+    grid.appendChild(row);
+  });
+}
+
+/* =========================================================
+   SHOP + PACK OPENING
+   ========================================================= */
+function renderShop(){
+  const grid = document.getElementById('packGrid');
+  grid.innerHTML = "";
+  PACKS.forEach(p=>{
+    const el = document.createElement('div');
+    el.className = 'pack-card';
+    const oddsLine = RARITY_ORDER
+      .filter(r=>p.odds[r]>0)
+      .map(r=>`<span style="color:${RARITY[r].color}">${RARITY[r].label}</span> ${p.odds[r]}%`)
+      .join(' · ');
+    el.innerHTML = `
+      <div class="pname">${p.name}</div>
+      <div class="pdesc">${p.desc} ${p.draws} cards per pack.</div>
+      <div class="podds">${oddsLine}</div>
+      <button class="pbuy" ${state.coins < p.cost ? 'disabled' : ''}>Open — ${p.cost} coins</button>
+    `;
+    el.querySelector('button').onclick = ()=> buyPack(p);
+    grid.appendChild(el);
+  });
+}
+
+function rollRarity(odds){
+  const r = Math.random()*100;
+  let acc = 0;
+  for(const rar of RARITY_ORDER){
+    acc += (odds[rar]||0);
+    if(r <= acc) return rar;
+  }
+  return "common";
+}
+
+function buyPack(pack){
+  if(!spendCoins(pack.cost)){ toast("Not enough coins!"); return; }
+  const pulls = [];
+  for(let i=0;i<pack.draws;i++){
+    let rarity = rollRarity(pack.odds);
+    const pool = CARD_DB.filter(c=>c.rarity===rarity);
+    const card = pool[Math.floor(Math.random()*pool.length)] || CARD_DB[0];
+    pulls.push(card);
+    giveCard(card.name);
+  }
+  renderOpenScreen(pulls);
+  goTo('open');
+}
+
+function renderOpenScreen(pulls){
+  const stack = document.getElementById('openStack');
+  const hint = document.getElementById('openHint');
+  const doneBtn = document.getElementById('openDoneBtn');
+  stack.innerHTML = "";
+  doneBtn.style.visibility = 'hidden';
+  hint.textContent = "Tap the card to reveal it";
+  updateOpenCounter(pulls.length, pulls.length);
+
+  // Build all cards (still-face-down), stacked with the first pull on top.
+  const cardEls = pulls.map((c,i)=>{
+    const wrap = document.createElement('div');
+    wrap.className = 'reveal-card';
+    wrap.innerHTML = `
+      <div class="face back">🎴<div class="backLabel">TAP TO OPEN</div></div>
+      <div class="face front">
+        <div class="rglyph">${c.rarity==='mythic'?'✨':c.rarity==='legendary'?'🏆':c.rarity==='epic'?'💠':c.rarity==='rare'?'🔷':c.rarity==='uncommon'?'🔹':'⚪'}</div>
+        <div class="rname">${c.name}</div>
+        <div class="rtag" style="color:${RARITY[c.rarity].color}">${RARITY[c.rarity].label}</div>
+      </div>
+    `;
+    wrap.style.boxShadow = `0 0 0 1.5px ${RARITY[c.rarity].color} inset`;
+    wrap.dataset.flipped = "0";
+    stack.appendChild(wrap);
+    return wrap;
+  });
+
+  let remaining = cardEls.length; // index of how many still stacked (front to back = 0..remaining-1)
+
+  function layout(){
+    cardEls.forEach((el,i)=>{
+      if(el.dataset.gone==="1") return;
+      const depth = i - (cardEls.length - remaining); // 0 = top card
+      if(depth < 0) { el.style.display='none'; return; }
+      el.style.display='block';
+      el.style.zIndex = 100 - depth;
+      el.style.pointerEvents = depth===0 ? 'auto' : 'none';
+      const scale = 1 - depth*0.05;
+      const ty = depth*10;
+      el.style.transform = `translateY(${ty}px) scale(${scale})`;
+      el.style.opacity = depth>2 ? 0 : 1;
+    });
+  }
+  layout();
+
+  function topCard(){
+    return cardEls.find(el => el.dataset.gone!=="1" && el.style.pointerEvents==='auto');
+  }
+
+  function dismiss(dir){
+    const el = topCard();
+    if(!el || el.dataset.flipped!=="1") return;
+    el.dataset.gone = "1";
+    const flipTransform = 'rotateY(180deg)';
+    el.style.transition = 'transform 0.4s ease, opacity 0.35s ease';
+    el.style.transform = `${flipTransform} translateX(${dir<0?'-160%':'160%'}) rotate(${dir<0?-18:18}deg)`;
+    el.style.opacity = '0';
+    remaining--;
+    updateOpenCounter(remaining, cardEls.length);
+    setTimeout(()=>{
+      el.style.display='none';
+      if(remaining>0){
+        hint.textContent = "Tap the card to reveal it";
+        layout();
+      } else {
+        hint.textContent = "All cards revealed!";
+        doneBtn.style.visibility = 'visible';
+      }
+    }, 380);
+  }
+
+  cardEls.forEach(el=>{
+    let dragStartX = null, dragging=false, curDX=0;
+
+    function onFlip(){
+      if(el !== topCard()) return;
+      if(el.dataset.flipped==="1") return;
+      el.dataset.flipped = "1";
+      el.style.transition = 'transform 0.5s cubic-bezier(.2,.8,.2,1)';
+      el.style.transform = 'rotateY(180deg)';
+      const idx = cardEls.indexOf(el);
+      const c = pulls[idx];
+      if(c.rarity==='legendary' || c.rarity==='mythic') toast(`${RARITY[c.rarity].label} pull! ${c.name}`);
+      hint.textContent = "Swipe (or tap again) to put it away";
+    }
+
+    el.addEventListener('click', (e)=>{
+      if(dragging) return;
+      if(el.dataset.flipped!=="1"){ onFlip(); }
+      else { dismiss(1); }
+    });
+
+    el.addEventListener('pointerdown', (e)=>{
+      if(el !== topCard() || el.dataset.flipped!=="1") return;
+      dragging = true; dragStartX = e.clientX;
+      el.setPointerCapture(e.pointerId);
+      el.style.transition = 'none';
+    });
+    el.addEventListener('pointermove', (e)=>{
+      if(!dragging) return;
+      curDX = e.clientX - dragStartX;
+      el.style.transform = `rotateY(180deg) translateX(${curDX}px) rotate(${curDX*0.05}deg)`;
+    });
+    function endDrag(e){
+      if(!dragging) return;
+      dragging = false;
+      if(Math.abs(curDX) > 70){
+        dismiss(curDX < 0 ? -1 : 1);
+      } else {
+        el.style.transition = 'transform 0.3s ease';
+        el.style.transform = 'rotateY(180deg)';
+      }
+      curDX = 0;
+      setTimeout(()=>{ dragging=false; },0);
+    }
+    el.addEventListener('pointerup', endDrag);
+    el.addEventListener('pointercancel', endDrag);
+  });
+}
+function updateOpenCounter(remaining,total){
+  const el = document.getElementById('openCounter');
+  if(remaining<=0){ el.textContent = `All ${total} cards revealed`; return; }
+  const cardNum = total - remaining + 1;
+  el.textContent = `Card ${cardNum} of ${total}`;
+}
+
+/* =========================================================
+   GAMES HUB
+   ========================================================= */
+const GAMES = [
+  { id:"maze", icon:"🧭", name:"Coin Maze", desc:"Race through a maze to the exit. Faster runs pay more.", reward:"Up to ~90 coins" },
+  { id:"tetris", icon:"🧱", name:"Block Drop", desc:"Clear lines, cash out any time you like.", reward:"Score ÷ 8 in coins" },
+  { id:"obby", icon:"🪜", name:"Sky Hopper", desc:"Climb as high as you can without falling.", reward:"Up to ~100 coins" },
+  { id:"memory", icon:"🃏", name:"Memory Match", desc:"Flip and match all 6 pairs in as few tries as possible.", reward:"Up to ~80 coins" },
+  { id:"whack", icon:"🎯", name:"Reflex Rush", desc:"Tap the targets before they duck away. 30 second round.", reward:"3 coins per hit" },
+];
+function renderGamesHub(){
+  const grid = document.getElementById('gameGrid');
+  grid.innerHTML = "";
+  GAMES.forEach(g=>{
+    const el = document.createElement('button');
+    el.className = 'game-card';
+    el.innerHTML = `<div class="gicon">${g.icon}</div><div class="gname">${g.name}</div><div class="gdesc">${g.desc}</div><div class="greward">${g.reward}</div>`;
+    el.onclick = ()=> launchGame(g.id);
+    grid.appendChild(el);
+  });
+}
+
+let activeGame = null; // {stop()}
+function stopActiveGame(){
+  if(activeGame && activeGame.stop){ activeGame.stop(); }
+  activeGame = null;
+  window.removeEventListener('keydown', keyHandlerRef);
+}
+let keyHandlerRef = ()=>{};
+
+function launchGame(id){
+  stopActiveGame();
+  const g = GAMES.find(x=>x.id===id);
+  document.getElementById('playTitle').textContent = g.name;
+  document.getElementById('playDesc').textContent = g.desc;
+  document.getElementById('gameHud').innerHTML = "";
+  document.getElementById('gameCanvasBox').innerHTML = "";
+  document.getElementById('gameControls').innerHTML = "";
+  document.getElementById('gameMsg').textContent = "";
+  goTo('play');
+  if(id==='maze') activeGame = startMaze();
+  if(id==='tetris') activeGame = startTetris();
+  if(id==='obby') activeGame = startObby();
+  if(id==='memory') activeGame = startMemory();
+  if(id==='whack') activeGame = startWhack();
+}
+
+function finishGame(coinsEarned, summary){
+  addCoins(Math.max(0, Math.round(coinsEarned)));
+  document.getElementById('gameMsg').innerHTML =
+    `<b style="color:var(--gold)">+${Math.max(0,Math.round(coinsEarned))} coins</b> — ${summary}`;
+  const controls = document.getElementById('gameControls');
+  controls.innerHTML = `<button class="btn primary" style="max-width:160px;">Play Again</button>`;
+  controls.querySelector('button').onclick = ()=> launchGame(GAMES.find(g=>document.getElementById('playTitle').textContent===g.name).id);
+}
+
+/* =========================================================
+   GAME 1: COIN MAZE
+   ========================================================= */
+function startMaze(){
+  const COLS=11, ROWS=11, CELL=30;
+  const box = document.getElementById('gameCanvasBox');
+  const canvas = document.createElement('canvas');
+  canvas.width = COLS*CELL; canvas.height = ROWS*CELL;
+  box.appendChild(canvas);
+  const ctx = canvas.getContext('2d');
+
+  document.getElementById('gameHud').innerHTML = `<span>⏱ Time: <span id="mazeTime">0.0</span>s</span>`;
+  document.getElementById('gameMsg').textContent = "Use arrow keys or WASD to reach the gold tile.";
+
+  // grid: 1 = wall
+  const grid = [];
+  for(let y=0;y<ROWS;y++){ grid.push(new Array(COLS).fill(1)); }
+  function carve(x,y){
+    grid[y][x]=0;
+    const dirs = [[0,-2],[0,2],[-2,0],[2,0]].sort(()=>Math.random()-0.5);
+    for(const [dx,dy] of dirs){
+      const nx=x+dx, ny=y+dy;
+      if(nx>0 && nx<COLS-1 && ny>0 && ny<ROWS-1 && grid[ny][nx]===1){
+        grid[y+dy/2][x+dx/2]=0;
+        carve(nx,ny);
+      }
+    }
+  }
+  carve(1,1);
+  grid[ROWS-2][COLS-2]=0;
+
+  const player = {x:1,y:1};
+  const goal = {x:COLS-2,y:ROWS-2};
+  let startTime = performance.now();
+  let finished = false;
+  let raf;
+
+  function draw(){
+    ctx.fillStyle = '#0a0814'; ctx.fillRect(0,0,canvas.width,canvas.height);
+    for(let y=0;y<ROWS;y++){
+      for(let x=0;x<COLS;x++){
+        if(grid[y][x]===1){
+          ctx.fillStyle = '#241d3d';
+          ctx.fillRect(x*CELL,y*CELL,CELL,CELL);
+        }
+      }
+    }
+    ctx.fillStyle = '#ffc94a';
+    ctx.beginPath();
+    ctx.arc(goal.x*CELL+CELL/2, goal.y*CELL+CELL/2, CELL*0.32, 0, 7);
+    ctx.fill();
+    ctx.fillStyle = '#3ee6d0';
+    ctx.beginPath();
+    ctx.arc(player.x*CELL+CELL/2, player.y*CELL+CELL/2, CELL*0.32, 0, 7);
+    ctx.fill();
+  }
+  function tick(){
+    if(!finished){
+      document.getElementById('mazeTime').textContent = ((performance.now()-startTime)/1000).toFixed(1);
+      raf = requestAnimationFrame(tick);
+    }
+  }
+  draw(); tick();
+
+  function tryMove(dx,dy){
+    if(finished) return;
+    const nx=player.x+dx, ny=player.y+dy;
+    if(grid[ny] && grid[ny][nx]===0){
+      player.x=nx; player.y=ny;
+      draw();
+      if(player.x===goal.x && player.y===goal.y){
+        finished = true;
+        const secs = (performance.now()-startTime)/1000;
+        const coins = Math.max(15, Math.round(100 - secs*4));
+        finishGame(coins, `Solved in ${secs.toFixed(1)}s`);
+      }
+    }
+  }
+  keyHandlerRef = (e)=>{
+    const k = e.key.toLowerCase();
+    if(k==='arrowup'||k==='w') tryMove(0,-1);
+    else if(k==='arrowdown'||k==='s') tryMove(0,1);
+    else if(k==='arrowleft'||k==='a') tryMove(-1,0);
+    else if(k==='arrowright'||k==='d') tryMove(1,0);
+    else return;
+    e.preventDefault();
+  };
+  window.addEventListener('keydown', keyHandlerRef);
+
+  // touch controls
+  const controls = document.getElementById('gameControls');
+  controls.innerHTML = `
+    <div style="display:grid; grid-template-columns:repeat(3,48px); gap:6px; justify-content:center;">
+      <span></span><button id="mUp">↑</button><span></span>
+      <button id="mLeft">←</button><button id="mDown">↓</button><button id="mRight">→</button>
+    </div>`;
+  document.getElementById('mUp').onclick=()=>tryMove(0,-1);
+  document.getElementById('mDown').onclick=()=>tryMove(0,1);
+  document.getElementById('mLeft').onclick=()=>tryMove(-1,0);
+  document.getElementById('mRight').onclick=()=>tryMove(1,0);
+
+  return { stop(){ finished=true; cancelAnimationFrame(raf); } };
+}
+
+/* =========================================================
+   GAME 2: BLOCK DROP (mini tetris)
+   ========================================================= */
+function startTetris(){
+  const COLS=8, ROWS=14, CELL=26;
+  const box = document.getElementById('gameCanvasBox');
+  const canvas = document.createElement('canvas');
+  canvas.width = COLS*CELL; canvas.height = ROWS*CELL;
+  box.appendChild(canvas);
+  const ctx = canvas.getContext('2d');
+
+  document.getElementById('gameHud').innerHTML = `<span>Score: <span id="tScore">0</span></span><span>Lines: <span id="tLines">0</span></span>`;
+  document.getElementById('gameMsg').textContent = "Cash out any time to bank your coins — but topping out ends the round with nothing extra.";
+
+  const SHAPES = {
+    I:[[1,1,1,1]], O:[[1,1],[1,1]], T:[[0,1,0],[1,1,1]],
+    S:[[0,1,1],[1,1,0]], Z:[[1,1,0],[0,1,1]], L:[[1,0],[1,0],[1,1]], J:[[0,1],[0,1],[1,1]],
+  };
+  const COLORS = {I:'#3ee6d0',O:'#ffc94a',T:'#b083ff',S:'#4ade80',Z:'#ff5d8f',L:'#f59e0b',J:'#38bdf8'};
+  let board = Array.from({length:ROWS},()=>Array(COLS).fill(null));
+  let score=0, lines=0, over=false, cashed=false;
+  let cur, curX, curY;
+
+  function newPiece(){
+    const keys = Object.keys(SHAPES);
+    const k = keys[Math.floor(Math.random()*keys.length)];
+    cur = SHAPES[k].map(r=>r.slice());
+    cur._color = COLORS[k];
+    curX = Math.floor(COLS/2) - Math.ceil(cur[0].length/2);
+    curY = -1;
+    if(collide(cur,curX,curY+1)){ over=true; endRound(false); }
+  }
+  function collide(shape,ox,oy){
+    for(let y=0;y<shape.length;y++)for(let x=0;x<shape[y].length;x++){
+      if(!shape[y][x]) continue;
+      const bx=ox+x, by=oy+y;
+      if(bx<0||bx>=COLS||by>=ROWS) return true;
+      if(by>=0 && board[by][bx]) return true;
+    }
+    return false;
+  }
+  function merge(){
+    for(let y=0;y<cur.length;y++)for(let x=0;x<cur[y].length;x++){
+      if(cur[y][x]){
+        const by=curY+y, bx=curX+x;
+        if(by>=0) board[by][bx]=cur._color;
+      }
+    }
+  }
+  function clearLines(){
+    let cleared=0;
+    for(let y=ROWS-1;y>=0;y--){
+      if(board[y].every(c=>c)){
+        board.splice(y,1);
+        board.unshift(Array(COLS).fill(null));
+        cleared++; y++;
+      }
+    }
+    if(cleared){
+      const pts=[0,100,300,500,800][cleared]||1000;
+      score += pts; lines += cleared;
+      document.getElementById('tScore').textContent=score;
+      document.getElementById('tLines').textContent=lines;
+    }
+  }
+  function rotate(shape){
+    const R = shape[0].map((_,i)=>shape.map(row=>row[i]).reverse());
+    return R;
+  }
+
+  let dropTimer, dropMs=650;
+  function step(){
+    if(over) return;
+    if(!collide(cur,curX,curY+1)){ curY++; }
+    else{
+      merge(); clearLines(); score+=5; document.getElementById('tScore').textContent=score;
+      newPiece();
+    }
+    draw();
+  }
+  function draw(){
+    ctx.fillStyle='#0a0814'; ctx.fillRect(0,0,canvas.width,canvas.height);
+    for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
+      if(board[y][x]){ ctx.fillStyle=board[y][x]; ctx.fillRect(x*CELL+1,y*CELL+1,CELL-2,CELL-2); }
+    }
+    if(!over && cur){
+      ctx.fillStyle=cur._color;
+      for(let y=0;y<cur.length;y++)for(let x=0;x<cur[y].length;x++){
+        if(cur[y][x] && curY+y>=0) ctx.fillRect((curX+x)*CELL+1,(curY+y)*CELL+1,CELL-2,CELL-2);
+      }
+    }
+    ctx.strokeStyle='#241d3d';
+    for(let x=0;x<=COLS;x++){ ctx.beginPath(); ctx.moveTo(x*CELL,0); ctx.lineTo(x*CELL,canvas.height); ctx.stroke(); }
+    for(let y=0;y<=ROWS;y++){ ctx.beginPath(); ctx.moveTo(0,y*CELL); ctx.lineTo(canvas.width,y*CELL); ctx.stroke(); }
+  }
+
+  function endRound(byChoice){
+    if(cashed) return;
+    cashed = true;
+    clearInterval(dropTimer);
+    const coins = Math.round(score/8);
+    finishGame(coins, byChoice ? `Cashed out with score ${score}` : `Topped out with score ${score}`);
+  }
+
+  newPiece(); draw();
+  dropTimer = setInterval(step, dropMs);
+
+  keyHandlerRef = (e)=>{
+    if(over||cashed) return;
+    const k=e.key.toLowerCase();
+    if(k==='arrowleft'||k==='a'){ if(!collide(cur,curX-1,curY)) curX--; }
+    else if(k==='arrowright'||k==='d'){ if(!collide(cur,curX+1,curY)) curX++; }
+    else if(k==='arrowdown'||k==='s'){ step(); }
+    else if(k==='arrowup'||k==='w'){ const r=rotate(cur); r._color=cur._color; if(!collide(r,curX,curY)) cur=r; }
+    else if(k===' '){ while(!collide(cur,curX,curY+1)) curY++; step(); }
+    else return;
+    e.preventDefault();
+    draw();
+  };
+  window.addEventListener('keydown', keyHandlerRef);
+
+  const controls = document.getElementById('gameControls');
+  controls.innerHTML = `
+    <button id="bLeft">←</button><button id="bRot">⟳ Rotate</button><button id="bRight">→</button>
+    <button id="bDown">↓ Drop</button>
+    <button id="bCash" style="background:var(--gold); color:#241703;">💰 Cash Out</button>
+  `;
+  document.getElementById('bLeft').onclick=()=>{ if(!collide(cur,curX-1,curY)) curX--; draw(); };
+  document.getElementById('bRight').onclick=()=>{ if(!collide(cur,curX+1,curY)) curX++; draw(); };
+  document.getElementById('bRot').onclick=()=>{ const r=rotate(cur); r._color=cur._color; if(!collide(r,curX,curY)) cur=r; draw(); };
+  document.getElementById('bDown').onclick=()=> step();
+  document.getElementById('bCash').onclick=()=> endRound(true);
+
+  return { stop(){ over=true; cashed=true; clearInterval(dropTimer); } };
+}
+
+/* =========================================================
+   GAME 3: SKY HOPPER (vertical obby/platformer)
+   ========================================================= */
+function startObby(){
+  const W=280, H=380;
+  const box = document.getElementById('gameCanvasBox');
+  const canvas = document.createElement('canvas');
+  canvas.width=W; canvas.height=H;
+  box.appendChild(canvas);
+  const ctx = canvas.getContext('2d');
+
+  document.getElementById('gameHud').innerHTML = `<span>Height: <span id="obHeight">0</span>m</span>`;
+  document.getElementById('gameMsg').textContent = "Arrow keys / A-D to move, Space or ↑ to jump. Don't fall off the bottom!";
+
+  let platforms = [];
+  function genPlatform(y){
+    return { x: 20+Math.random()*(W-80), y, w: 60+Math.random()*30 };
+  }
+  platforms.push({x:W/2-40, y:H-30, w:80});
+  for(let y=H-30-50; y>-400; y-=45+Math.random()*20){
+    platforms.push(genPlatform(y));
+  }
+
+  const player = { x:W/2, y:H-60, vx:0, vy:0, r:9, onGround:false };
+  let camY = 0;
+  let maxHeight = 0;
+  let over = false;
+  let keys = {left:false,right:false};
+  const GRAV=0.5, JUMP=-10.5, MOVE=3.2;
+
+  function update(){
+    if(over) return;
+    player.vy += GRAV;
+    if(keys.left) player.vx = -MOVE;
+    else if(keys.right) player.vx = MOVE;
+    else player.vx *= 0.8;
+    player.x += player.vx;
+    if(player.x < 8) player.x=8;
+    if(player.x > W-8) player.x=W-8;
+    player.y += player.vy;
+
+    player.onGround=false;
+    if(player.vy>0){
+      for(const p of platforms){
+        const py = p.y;
+        if(player.x > p.x-6 && player.x < p.x+p.w+6 &&
+           player.y+player.r > py && player.y+player.r < py+14 && (player.y - player.vy + player.r) <= py){
+          player.y = py - player.r;
+          player.vy = 0;
+          player.onGround = true;
+        }
+      }
+    }
+
+    // camera follows upward
+    const targetCam = Math.min(camY, player.y - H*0.55);
+    camY += (targetCam - camY); // instant follow upward only
+    if(player.y - H*0.55 < camY) camY = player.y - H*0.55;
+
+    const heightScore = Math.max(0, Math.round((H-60-player.y+ (H-60-camY - (H-60-player.y)))/8));
+    maxHeight = Math.max(maxHeight, Math.round((-camY)/8) + 0);
+    document.getElementById('obHeight').textContent = Math.max(0,maxHeight);
+
+    // generate more platforms above as needed
+    while(platforms[platforms.length-1].y > camY-40){
+      platforms.push(genPlatform(platforms[platforms.length-1].y - (45+Math.random()*20)));
+    }
+    // trim far-below platforms
+    platforms = platforms.filter(p=>p.y < camY+H+60);
+
+    if(player.y > camY + H + 40){
+      over = true;
+      const coins = Math.max(10, Math.round(maxHeight*1.1));
+      finishGame(coins, `Reached ${maxHeight}m before falling`);
+    }
+  }
+  function draw(){
+    ctx.fillStyle='#0a0814'; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#1a1530';
+    for(let i=0;i<40;i++){
+      const sx = (i*53)%W, sy = ((i*97) - (camY*0.2))%H;
+      ctx.fillRect(sx, ((sy%H)+H)%H, 2,2);
+    }
+    ctx.fillStyle='#4ade80';
+    for(const p of platforms){
+      ctx.fillRect(p.x, p.y-camY, p.w, 10);
+    }
+    ctx.fillStyle='#3ee6d0';
+    ctx.beginPath();
+    ctx.arc(player.x, player.y-camY, player.r, 0, 7);
+    ctx.fill();
+  }
+  let raf;
+  function loop(){ update(); draw(); if(!over) raf=requestAnimationFrame(loop); }
+  loop();
+
+  function jump(){ if(player.onGround && !over){ player.vy = JUMP; player.onGround=false; } }
+  keyHandlerRef = (e)=>{
+    const k=e.key.toLowerCase();
+    if(k==='arrowleft'||k==='a') keys.left=true;
+    else if(k==='arrowright'||k==='d') keys.right=true;
+    else if(k==='arrowup'||k==='w'||k===' ') jump();
+    else return;
+    e.preventDefault();
+  };
+  const keyUp = (e)=>{
+    const k=e.key.toLowerCase();
+    if(k==='arrowleft'||k==='a') keys.left=false;
+    if(k==='arrowright'||k==='d') keys.right=false;
+  };
+  window.addEventListener('keydown', keyHandlerRef);
+  window.addEventListener('keyup', keyUp);
+
+  const controls = document.getElementById('gameControls');
+  controls.innerHTML = `<button id="oLeft">←</button><button id="oJump">⤒ Jump</button><button id="oRight">→</button>`;
+  const oLeft=document.getElementById('oLeft'), oRight=document.getElementById('oRight'), oJump=document.getElementById('oJump');
+  const setHold=(el,onOn,onOff)=>{
+    el.addEventListener('mousedown',onOn); el.addEventListener('touchstart',(e)=>{e.preventDefault();onOn();});
+    el.addEventListener('mouseup',onOff); el.addEventListener('mouseleave',onOff); el.addEventListener('touchend',onOff);
+  };
+  setHold(oLeft, ()=>keys.left=true, ()=>keys.left=false);
+  setHold(oRight, ()=>keys.right=true, ()=>keys.right=false);
+  oJump.addEventListener('click', jump);
+
+  return { stop(){ over=true; cancelAnimationFrame(raf); window.removeEventListener('keyup',keyUp); } };
+}
+
+/* =========================================================
+   GAME 4: MEMORY MATCH
+   ========================================================= */
+function startMemory(){
+  const box = document.getElementById('gameCanvasBox');
+  const grid = document.createElement('div');
+  grid.id = 'memGrid';
+  box.appendChild(grid);
+
+  const EMOJI = ['⭐','🔥','⚡','🎯','🏆','💎'];
+  let deck = [...EMOJI, ...EMOJI].map((sym,i)=>({sym,id:i,matched:false}));
+  deck.sort(()=>Math.random()-0.5);
+
+  let moves=0, matchedPairs=0, lock=false, flipped=[];
+  document.getElementById('gameHud').innerHTML = `<span>Moves: <span id="memMoves">0</span></span><span>Pairs: <span id="memPairs">0</span>/6</span>`;
+  document.getElementById('gameMsg').textContent = "Find all 6 matching pairs.";
+
+  deck.forEach((card,idx)=>{
+    const cell = document.createElement('div');
+    cell.className = 'mem-cell';
+    cell.dataset.idx = idx;
+    cell.onclick = ()=> flip(idx,cell);
+    grid.appendChild(cell);
+  });
+
+  function flip(idx,cell){
+    if(lock || cell.classList.contains('up') || cell.classList.contains('matched')) return;
+    cell.classList.add('up');
+    cell.textContent = deck[idx].sym;
+    flipped.push({idx,cell});
+    if(flipped.length===2){
+      moves++;
+      document.getElementById('memMoves').textContent = moves;
+      lock = true;
+      const [a,b] = flipped;
+      if(deck[a.idx].sym === deck[b.idx].sym){
+        a.cell.classList.add('matched'); b.cell.classList.add('matched');
+        matchedPairs++;
+        document.getElementById('memPairs').textContent = matchedPairs;
+        flipped = []; lock=false;
+        if(matchedPairs===EMOJI.length){
+          const coins = Math.max(20, Math.round(200 - moves*6));
+          setTimeout(()=>finishGame(coins, `Solved in ${moves} moves`), 300);
+        }
+      } else {
+        setTimeout(()=>{
+          a.cell.classList.remove('up'); a.cell.textContent='';
+          b.cell.classList.remove('up'); b.cell.textContent='';
+          flipped=[]; lock=false;
+        }, 700);
+      }
+    }
+  }
+  return { stop(){} };
+}
+
+/* =========================================================
+   GAME 5: REFLEX RUSH (whack-a-mole)
+   ========================================================= */
+function startWhack(){
+  const box = document.getElementById('gameCanvasBox');
+  const grid = document.createElement('div');
+  grid.id = 'whackGrid';
+  box.appendChild(grid);
+
+  let hits=0, timeLeft=30, over=false;
+  document.getElementById('gameHud').innerHTML = `<span>⏱ <span id="wTime">30</span>s</span><span>Hits: <span id="wHits">0</span></span>`;
+  document.getElementById('gameMsg').textContent = "Tap the glowing holes fast!";
+
+  const holes = [];
+  for(let i=0;i<9;i++){
+    const h = document.createElement('div');
+    h.className='whack-hole';
+    h.onclick = ()=>{
+      if(h.classList.contains('active') && !over){
+        h.classList.remove('active'); h.textContent='';
+        hits++; document.getElementById('wHits').textContent=hits;
+      }
+    };
+    grid.appendChild(h); holes.push(h);
+  }
+
+  let popTimer, countdown;
+  function popRandom(){
+    holes.forEach(h=>{ h.classList.remove('active'); h.textContent=''; });
+    const h = holes[Math.floor(Math.random()*holes.length)];
+    h.classList.add('active'); h.textContent='😀';
+    setTimeout(()=>{ if(!over){ h.classList.remove('active'); h.textContent=''; } }, 650);
+  }
+  popTimer = setInterval(popRandom, 700);
+  countdown = setInterval(()=>{
+    timeLeft--;
+    document.getElementById('wTime').textContent = timeLeft;
+    if(timeLeft<=0){
+      over = true;
+      clearInterval(popTimer); clearInterval(countdown);
+      holes.forEach(h=>{ h.classList.remove('active'); h.textContent=''; });
+      const coins = hits*3;
+      finishGame(coins, `${hits} hits`);
+    }
+  },1000);
+
+  return { stop(){ over=true; clearInterval(popTimer); clearInterval(countdown); } };
+}
+
+/* =========================================================
+   INIT
+   ========================================================= */
+renderWallet(false);
+goTo('menu');
+</script>
+</body>
+</html>
